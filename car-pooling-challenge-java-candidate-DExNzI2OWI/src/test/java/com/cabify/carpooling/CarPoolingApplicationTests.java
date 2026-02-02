@@ -21,15 +21,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @SpringBootTest
 @AutoConfigureMockMvc
 class CarPoolingApplicationTests {
-	private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    MockMvc mvc;
+
+    @Autowired
+	private ObjectMapper objectMapper;
 
 	@Test
-	public void itShouldHaveOkStatus(@Autowired MockMvc mvc) throws Exception {
+	public void itShouldHaveOkStatus() throws Exception {
 		mvc.perform(get("/status")).andExpect(status().isOk());
 	}
 
 	@Test
-	public void itShouldManageJourney(@Autowired MockMvc mvc) throws Exception {
+	public void itShouldManageJourney() throws Exception {
 		var cars = List.of(
 			new Car(1, 4),
 			new Car(2, 6));
