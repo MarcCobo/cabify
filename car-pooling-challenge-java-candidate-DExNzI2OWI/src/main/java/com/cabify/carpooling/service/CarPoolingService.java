@@ -14,9 +14,9 @@ import com.cabify.carpooling.service.exception.DuplicatedIdException;
 @Service
 public class CarPoolingService {
 
-    private List<Car> cars = new ArrayList<>();
-    private List<Journey> journeys =new ArrayList<>();
-    private List<Journey> pending=new ArrayList<>();
+    private final List<Car> cars = new ArrayList<>();
+    private final List<Journey> journeys = new ArrayList<>();
+    private final List<Journey> pending = new ArrayList<>();
 
     public void resetCars(List<Car> cars) {
         this.cars.clear();
@@ -24,7 +24,7 @@ public class CarPoolingService {
         this.pending.clear();
         for (Car c1 : cars) {
             if (c1.getMaxSeats() < 4 || c1.getMaxSeats() > 6) {
-                throw new IllegalArgumentException("invalid seats");
+                throw new IllegalArgumentException("Invalid seats");
             }
             if (this.cars.stream().anyMatch(c2 -> c2.getID() == c1.getID())) {
                 throw new DuplicatedIdException("IDs are duplicated");
@@ -37,18 +37,26 @@ public class CarPoolingService {
         if (this.journeys.stream().anyMatch(j -> j.getId() == journey.getId())) {
             throw new DuplicatedIdException("Journey ID is already used");
         }
-        Car car = this.cars
-                .stream()
-                .filter(c -> journey.getPassengers() <= c.getAvailableSeats())
-                .findFirst()
-                .orElse(null);
-        if (car != null) {
-            journey.setAssignedTo(car);
-            car.setAvailableSeats(car.getAvailableSeats() - journey.getPassengers());
+        if (!this.pending.isEmpty()) {
+            this.pending.forEach(j -> {
+                Optional<Car> car = findCar(j.getPassengers());
+                car.ifPresent(c -> {
+                    System.out.format(">> Car %d assigned to pending journey %d\n", c.getID(), j.getId());
+                    j.setAssignedTo(c);
+                    c.setAvailableSeats(c.getAvailableSeats() - j.getPassengers());
+                    this.pending.removeIf(j2 -> j2.getId() == j.getId());
+                    this.journeys.add(j);
+                });
+            });
+        }
+        Optional<Car> car = findCar(journey.getPassengers());
+        if (car.isPresent()) {
+            journey.setAssignedTo(car.orElse(null));
+            car.get().setAvailableSeats(car.get().getAvailableSeats() - journey.getPassengers());
+            this.journeys.add(journey);
         } else {
             this.pending.add(journey);
         }
-        this.journeys.add(journey);
     }
 
     public Car dropoff(int journeyID) {
@@ -85,13 +93,14 @@ public class CarPoolingService {
                 .stream()
                 .filter(j -> j.getId() == journeyID)
                 .findAny()
-                .orElseThrow(() -> new NoSuchElementException("journey not found"));
+                .orElseThrow(() -> new NoSuchElementException("Journey not found"));
         return journey.getAssignedTo();
     }
 
     private Optional<Car> findCar(int seats) {
         return this.cars.stream()
                 .filter(c -> c.getAvailableSeats() >= seats)
+                .filter(c -> c.getAvailableSeats() == c.getMaxSeats())
                 .findAny();
     }
 

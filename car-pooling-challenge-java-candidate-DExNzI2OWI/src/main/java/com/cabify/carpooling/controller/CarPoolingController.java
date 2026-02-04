@@ -3,23 +3,18 @@ package com.cabify.carpooling.controller;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import com.cabify.carpooling.service.exception.DuplicatedIdException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
 import com.cabify.carpooling.model.Car;
 import com.cabify.carpooling.model.Journey;
 import com.cabify.carpooling.service.CarPoolingService;
+import org.springframework.web.server.UnsupportedMediaTypeStatusException;
 
 @RestController
 @RequestMapping("/*")
@@ -33,18 +28,6 @@ public class CarPoolingController {
     public void getStatus() {
     }
 
-    @GetMapping("/cars")
-    @ResponseStatus(HttpStatus.OK)
-    public List<Car> getCars() {
-        return carJourneyService.getCars();
-    }
-
-    @GetMapping("/journeys")
-    @ResponseStatus(HttpStatus.OK)
-    public List<Journey> getJourneys() {
-        return carJourneyService.getJourneys();
-    }
-
     @PutMapping(value = "/cars", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public void putCars(@RequestBody List<Car> cars) {
@@ -52,47 +35,40 @@ public class CarPoolingController {
     }
 
     @PostMapping("/journey")
-    public ResponseEntity<Void> postJourney(@RequestBody Journey journey) {
+    public ResponseEntity<String> postJourney(@Validated @RequestBody Journey journey) {
         if (journey.getId() <= 0) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            throw new IllegalArgumentException("Journey ID value not valid");
         }
         carJourneyService.newJourney(journey);
-        return new ResponseEntity<>(HttpStatus.ACCEPTED);
+        return new ResponseEntity<>("New journey created", HttpStatus.ACCEPTED);
     }
 
     @PostMapping("/dropoff")
-    public ResponseEntity<Void> postDropoff(@RequestParam("ID") int journeyID) {
+    public ResponseEntity<String> postDropoff(@RequestParam("ID") int journeyID) {
         if (journeyID <= 0) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            throw new IllegalArgumentException("Journey ID value not valid");
         }
-        try {
-            Car car = carJourneyService.dropoff(journeyID);
-            if (car != null) {
-                carJourneyService.reassign(car);
-            }
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (NoSuchElementException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        Car car = carJourneyService.dropoff(journeyID);
+        if (car != null) {
+            carJourneyService.reassign(car);
         }
+        return new ResponseEntity<>("Dropoff completed", HttpStatus.OK);
     }
 
     @PostMapping(
             value = "/locate",
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = "application/json")
-    @ResponseStatus(HttpStatus.OK)
     public @ResponseBody ResponseEntity<Car> postLocate(@RequestParam("ID") final int journeyID) {
         if (journeyID <= 0) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            throw new IllegalArgumentException("Journey ID value not valid");
         }
-        try {
-            Car car = carJourneyService.locate(journeyID);
-            if (car == null) {
-                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-            }
-            return new ResponseEntity<>(car, HttpStatus.OK);
-        } catch (NoSuchElementException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        Car car = carJourneyService.locate(journeyID);
+        if (car == null) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         }
+        return new ResponseEntity<>(car, HttpStatus.OK);
     }
+
+
 }
